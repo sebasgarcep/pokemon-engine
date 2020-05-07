@@ -1,4 +1,5 @@
 const readline = require('readline');
+const range = require('lodash.range');
 const { Battle } = require('../../src');
 const moveData = require('../../src/data/moves');
 const pokemonData = require('../../src/data/pokemon');
@@ -6,7 +7,7 @@ const pokemonData = require('../../src/data/pokemon');
 class TerminalGame {
   constructor(p1, p2) {
     this.queue = Promise.resolve();
-    this.teams = { p1, p2 };
+    this.players = [{ id: 'p1', team: p1 }, { id: 'p2', team: p2 }];
     this.battle = new Battle();
     this.rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -19,10 +20,9 @@ class TerminalGame {
   }
 
   start() {
-    for (const id of ['p1', 'p2']) {
+    for (const idx of range(this.players.length)) {
       this.battle.setPlayer(
-        id,
-        this.teams[id],
+        this.players[idx].team,
         this.onTeamPreview.bind(this),
         this.onMove.bind(this),
         this.onForceSwitch.bind(this),
@@ -50,7 +50,7 @@ class TerminalGame {
   }
 
   onTeamPreview(select, player, rival) {
-    let message = `${player.id} team: ${player.team.map(item => item.species).join(', ')}\n`;
+    let message = `p${player.id} team: ${player.team.map(item => item.species).join(', ')}\n`;
     message += `rival: ${rival.team.map(item => item.species).join(', ')}\n`;
     return this.prompt(message, response => {
       const choices = response.replace(/\D/g, '').split('');
@@ -157,7 +157,7 @@ class TerminalGame {
     const phase = this.battle.getPhase(null);
     const playerActiveMessage = player.active.map(item => this.formatPokemonState(item)).join(' / ');
     const rivalActiveMessage = rival.active.map(item => this.formatPokemonState(item)).join(' / ');
-    let message = `${player.id} team: ${playerActiveMessage}\n`;
+    let message = `p${player.id} team: ${playerActiveMessage}\n`;
     message += `rival: ${rivalActiveMessage}\n`;
     return this.prompt(message, response => {
       const [type, ...input] = response.split(' ');
@@ -181,7 +181,7 @@ class TerminalGame {
   }
 
   onForceSwitch(change, player, rival, field, forcedSwitches) {
-    let message = `${player.id} must switch out these positions: ${forcedSwitches.join(', ')}`;
+    let message = `p${player.id} must switch out these positions: ${forcedSwitches.join(', ')}`;
     const playerPassiveMessage = player.passive
       .filter(state => state !== null)
       .map(state => this.formatPokemonState(state))

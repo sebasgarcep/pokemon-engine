@@ -40,7 +40,7 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
 
 /**
  * @typedef {Object} PlayerState
- * @property {string} id
+ * @property {number} id
  * @property {PokemonBuild[]} builds
  * @property {PokemonState[]} active
  * @property {PokemonState[]} passive
@@ -54,7 +54,7 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
 
 /**
  * @typedef {Object} Position
- * @property {string} id
+ * @property {number} id
  * @property {number} pos
  */
 
@@ -62,7 +62,7 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
  * @typedef {Object} State
  * @property {Phase} phase
  * @property {number} turn
- * @property {Object<string, PlayerState>} players
+ * @property {PlayerState[]} players
  * @property {FieldState} field
  * @property {Position[]} order
  * @property {any} seed
@@ -72,14 +72,14 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
 const initalState = {
   phase: 'setplayers',
   turn: 0,
-  players: {},
+  players: [],
   field: null,
   order: [],
   seed: null,
 };
 
 class Battle {
-  constructor({ hooks = {}, state = initalState, format = 'doubles' } = {}) {
+  constructor({ hooks = [], state = initalState, format = 'doubles' } = {}) {
     // attributes
     this.hooks = hooks;
     /** @type {State} */
@@ -109,9 +109,11 @@ class Battle {
     return this.state;
   }
 
-  setPlayer(id, builds, onTeamPreview, onMove, onForceSwitch, onEnd) {
-    if (this.getIds().length >= 2) { throw new Error('Cannot set more than two players.'); }
+  setPlayer(builds, onTeamPreview, onMove, onForceSwitch, onEnd) {
+    const numPlayers = this.state.players.length;
+    if (numPlayers >= 2) { throw new Error('Cannot set more than two players.'); }
 
+    const id = numPlayers + 1;
     const opts = {
       onTeamPreview: (...args) => onTeamPreview(this.select.bind(this, id), ...args),
       onMove: (...args) => onMove(this.move.bind(this, id), this.switch.bind(this, id), ...args),
@@ -119,17 +121,17 @@ class Battle {
       onEnd,
     };
 
-    this.hooks[id] = opts;
+    this.hooks.push(opts);
 
     this.updateState(state => {
-      state.players[id] = {
+      state.players.push({
         id,
         builds,
         active: null,
         passive: null,
         actions: null,
         forcedSwitches: null,
-      };
+      });
     });
   }
 
@@ -159,16 +161,20 @@ class Battle {
   }
 
   getIds() {
-    return Object.keys(this.hooks);
+    return range(1, this.state.players.length + 1);
   }
 
   /**
    * Gets the rival's id for a given player id.
-   * @param {string} id
-   * @returns {string}
+   * @param {number} id
+   * @returns {number}
    */
   getRivalId(id) {
-    return this.getIds().find(item => item !== id);
+    return this.state.players.length - id + 1;
+  }
+
+  getAllyPosition(pos) {
+    return this.format.active - pos + 1;
   }
 
   /**
@@ -197,13 +203,13 @@ class Battle {
   getCompletePlayerState(playerId) {
     const player = {
       id: playerId,
-      active: this.state.players[playerId].active,
-      passive: this.state.players[playerId].passive,
+      active: this.state.players[playerId - 1].active,
+      passive: this.state.players[playerId - 1].passive,
     };
     const rivalId = this.getRivalId(playerId);
     const rival = {
       id: rivalId,
-      active: this.state.players[rivalId].active
+      active: this.state.players[rivalId - 1].active
         .map(item => item && { ...item, hp: Math.ceil( item.hp * 48 / item.maxhp ), maxhp: 48 }),
       passive: [], // FIXME: Only show Pokemon that have come out, otherwise set to null or something else.
     };
@@ -212,23 +218,22 @@ class Battle {
   }
 
   start() {
-    const ids = this.getIds();
-    if (ids.length < 2) { throw new Error('Both players must be set for the battle to begin.'); }
+    if (this.state.players.length < 2) { throw new Error('Both players must be set for the battle to begin.'); }
     this.updateState(state => {
       state.phase = 'teampreview';
     });
-    for (const playerId of ids) {
+    for (const playerId of this.getIds()) {
       const player = {
         id: playerId,
-        team: this.state.players[playerId].builds,
+        team: this.state.players[playerId - 1].builds,
       };
       const rivalId = this.getRivalId(playerId);
       const rival = {
         id: rivalId,
-        team: this.state.players[rivalId].builds
+        team: this.state.players[rivalId - 1].builds
           .map(item => ({ species: item.species, gender: item.gender })),
       };
-      this.hooks[playerId].onTeamPreview(player, rival);
+      this.hooks[playerId - 1].onTeamPreview(player, rival);
     }
   }
 
@@ -237,7 +242,7 @@ class Battle {
     if (choices.length !== this.format.total) {
       throw new Error(`You must select exactly ${this.format.total} pokemon.`);
     }
-    const builds = this.state.players[id].builds;
+    const builds = this.state.players[id - 1].builds;
     const team = choices.map(index => PokemonStateFactory.create(id, builds[index - 1]));
     const active = team.slice(0, this.format.active);
     const passive = [
@@ -245,14 +250,14 @@ class Battle {
       ...range(this.format.active).map(() => null),
     ];
     this.updateState(state => {
-      state.players[id].active = active;
-      state.players[id].passive = passive;
-      state.players[id].actions = active.map(() => null);
-      state.players[id].forcedSwitches = [];
+      state.players[id - 1].active = active;
+      state.players[id - 1].passive = passive;
+      state.players[id - 1].actions = active.map(() => null);
+      state.players[id - 1].forcedSwitches = [];
     });
     // Check for Team Preview end
     const ids = this.getIds();
-    if (ids.every(playerId => !!this.state.players[playerId].active)) {
+    if (ids.every(playerId => !!this.state.players[playerId - 1].active)) {
       this.beginBattle();
     }
   }
@@ -267,16 +272,10 @@ class Battle {
   }
 
   initializeField() {
-    const global = {};
-    const sides = this.getIds()
-      .reduce((item, id) => {
-        item[id] = {};
-        return item;
-      }, {});
     this.updateState(state => {
       state.field = {
-        global,
-        sides,
+        global: {},
+        sides: this.getIds().map(() => ({})),
       };
     });
   }
@@ -292,7 +291,7 @@ class Battle {
     const ids = this.getIds();
     for (const playerId of ids) {
       const { player, rival, field } = this.getCompletePlayerState(playerId);
-      this.hooks[playerId].onMove(player, rival, field);
+      this.hooks[playerId - 1].onMove(player, rival, field);
     }
   }
 
@@ -355,11 +354,11 @@ class Battle {
         const action = { type: 'switch', passive: passivePos };
         this.setAction(state, id, activePos, action);
       } else if (state.phase === 'run' || state.phase === 'switch') {
-        let { forcedSwitches } = this.state.players[id];
+        let { forcedSwitches } = this.state.players[id - 1];
         if (!forcedSwitches.includes(activePos)) { throw new Error('This Pokemon cannot be switched out.'); }
         forcedSwitches = forcedSwitches.filter(item => item !== activePos);
         this.executeSwitch(state, id, activePos, passivePos);
-        state.players[id].forcedSwitches = forcedSwitches;
+        state.players[id - 1].forcedSwitches = forcedSwitches;
       }
     });
     if (this.state.phase === 'choice') { this.commit(); }
@@ -377,69 +376,69 @@ class Battle {
   /**
    * Gets a Pokemon from a certain slot.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {'active' | 'passive'} location
    * @param {number} pos
    */
   getPokemon(state, id, location, pos) {
     state = state || this.state;
-    return state.players[id][location][pos - 1];
+    return state.players[id - 1][location][pos - 1];
   }
 
   /**
    * Gets a Pokemon from a certain slot.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {'active' | 'passive'} location
    * @param {number} pos
    * @param {any} data
    */
   setPokemon(state, id, location, pos, data) {
-    state.players[id][location][pos - 1] = data;
+    state.players[id - 1][location][pos - 1] = data;
   }
 
   /**
    * Returns a move at a particular location.
-   * @param {string} id
+   * @param {number} id
    * @param {'active' | 'passive'} location
    * @param {number} pokemonPos
    * @param {number} movePos
    */
   getMove(state, id, location, pokemonPos, movePos) {
     state = state || this.state;
-    return this.state.players[id][location][pokemonPos - 1].moves[movePos - 1];
+    return this.state.players[id - 1][location][pokemonPos - 1].moves[movePos - 1];
   }
 
   /**
    * Gets the action associated with a player and an active position.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {number} pos
    */
   getAction(state, id, pos) {
     state = state || this.state;
-    return this.state.players[id].actions[pos - 1];
+    return this.state.players[id - 1].actions[pos - 1];
   }
 
   /**
    * Sets an action in place.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {number} pos
    * @param {Action} action
    */
   setAction(state, id, pos, action) {
-    state.players[id].actions[pos - 1] = action;
+    state.players[id - 1].actions[pos - 1] = action;
   }
 
   /**
    * Clears an action slot.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {number} pos
    */
   clearAction(state, id, pos) {
-    state.players[id].actions[pos - 1] = null;
+    state.players[id - 1].actions[pos - 1] = null;
   }
 
   /**
@@ -501,7 +500,7 @@ class Battle {
   /**
    * Switches two pokemon.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {number} activePos
    * @param {number} passivePos
    */
@@ -512,7 +511,7 @@ class Battle {
     // FIXME: do some cleanup like clear volatiles, boosts, etc.
     this.setPokemon(state, id, 'active', activePos, passive);
     this.setPokemon(state, id, 'passive', passivePos, active);
-    state.players[id].passive.sort((a, b) => {
+    state.players[id - 1].passive.sort((a, b) => {
       if ((a === null && b === null) || (a !== null && b !== null)) {
         return 0;
       } else if (a === null) {
@@ -526,12 +525,12 @@ class Battle {
   /**
    * Gets the number for the first unoccupied passive position.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    */
   getFirstEmptyPassivePosition(state, id) {
     state = state || this.state;
     for (const pos of range(1, this.format.total)) {
-      if (state.players[id].passive[pos - 1] === null) {
+      if (state.players[id - 1].passive[pos - 1] === null) {
         return pos;
       }
     }
@@ -541,25 +540,25 @@ class Battle {
   /**
    * Gets a boost for a corresponding stat.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {number} pos
    * @param {'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'accuracy' | 'evasion'} key
    */
   getBoost(state, id, pos, key) {
     state = state || this.state;
-    return state.players[id].active[pos - 1].boosts[key];
+    return state.players[id - 1].active[pos - 1].boosts[key];
   }
 
   /**
    * Gets a stat taking into account boosts.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {number} pos
    * @param {'atk' | 'def' | 'spa' | 'spd' | 'spe'} key
    */
   getBoostedStat(state, id, pos, key) {
     state = state || this.state;
-    const stat = state.players[id].active[pos - 1].stats[key];
+    const stat = state.players[id - 1].active[pos - 1].stats[key];
     const boost = this.getBoost(state, id, pos, key);
     return getBoostedValue(key, boost, stat);
   }
@@ -578,7 +577,7 @@ class Battle {
     this.updateState(state => {
       state.phase = 'switch';
       for (const id of this.getIds()) {
-        const { active, passive } = state.players[id];
+        const { active, passive } = state.players[id - 1];
         const forcedSwitches = [];
         for (let pos = 1; pos <= this.format.active; pos += 1) {
           if (active[pos - 1] === null) {
@@ -589,22 +588,22 @@ class Battle {
         if (passive.find(item => item && item.hp > 0) === undefined) {
           continue;
         }
-        state.players[id].forcedSwitches = forcedSwitches;
+        state.players[id - 1].forcedSwitches = forcedSwitches;
       }
     });
-    const ids = this.getIds().filter(id => this.state.players[id].forcedSwitches.length > 0);
+    const ids = this.getIds().filter(id => this.state.players[id - 1].forcedSwitches.length > 0);
     if (ids.length === 0) {
       this.finishForcedSwitches();
     } else {
       for (const id of ids) {
         const { player, rival, field } = this.getCompletePlayerState(id);
-        this.hooks[id].onForceSwitch(player, rival, field, this.state.players[id].forcedSwitches);
+        this.hooks[id - 1].onForceSwitch(player, rival, field, this.state.players[id - 1].forcedSwitches);
       }
     }
   }
 
   hasForcedSwitchesLeft(id) {
-    const forcedSwitches = this.state.players[id].forcedSwitches;
+    const forcedSwitches = this.state.players[id - 1].forcedSwitches;
     return forcedSwitches.length > 0;
   }
 
@@ -634,7 +633,7 @@ class Battle {
   /**
    * Gets all target positions targeted by a move.
    * @param {State} state
-   * @param {string} id
+   * @param {number} id
    * @param {string} target
    * @param {number} pos
    * @returns {Position[]}
@@ -646,7 +645,7 @@ class Battle {
       if (this.getPokemon(state, rivalId, 'active', pos)) {
         targetPositions.push({ id: rivalId, pos });
       } else {
-        targetPositions.push({ id: rivalId, pos: 3 - pos });
+        targetPositions.push({ id: rivalId, pos: this.getAllyPosition(pos) });
       }
     } else if (target === 'allAdjacentFoes') {
       for (const activePos of range(1, this.format.total + 1)) {
@@ -728,7 +727,7 @@ class Battle {
   }
 
   /**
-   * @param {string} id
+   * @param {number} id
    * @param {number} pos
    */
   executeMoveAction(id, pos) {
