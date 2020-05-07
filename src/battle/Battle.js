@@ -140,12 +140,12 @@ class Battle {
     } else if (type === 'executeAction') {
       this.setOrder(state);
       // @ts-ignore
-      this.onExecuteAction(state, ...args);
+      this.onExecuteAction(state);
     } else if (type === 'startNextTurn') {
       this.setNextTurn(state);
     } else if (type === 'setWaitingInput') {
       const [id] = args;
-      this.state.players[id - 1].waitingInput = true;
+      state.players[id - 1].waitingInput = true;
     } else if (type === 'setForcedSwitches') {
       const [forcedSwitches] = args;
       for (const id of this.getIds()) {
@@ -182,9 +182,9 @@ class Battle {
       if (shouldTriggerForcedSwitches) {
         this.triggerOnForceSwitch();
       } else {
-        const position = this.getNextActionPosition(this.state);
-        if (position) {
-          this.dispatch('executeAction', position.id, position.pos);
+        const shouldExecuteAction = this.state.players.find(item => item.actions.find(action => !!action));
+        if (shouldExecuteAction) {
+          this.dispatch('executeAction');
         } else {
           this.startNextTurn();
         }
@@ -570,6 +570,7 @@ class Battle {
       }
     }
     this.setAction(id, activePos, { type: 'switch', passive: passivePos });
+    if (this.state.phase === 'run') { this.dispatch('executeAction'); }
   }
 
   // TODO: Solve this
@@ -595,7 +596,6 @@ class Battle {
    * @param {number} pos
    */
   getPokemon(state, id, location, pos) {
-    state = state || this.state;
     return state.players[id - 1][location][pos - 1];
   }
 
@@ -615,14 +615,14 @@ class Battle {
   /**
    * Returns a move at a particular location.
    * @private
+   * @param {State} state
    * @param {number} id
    * @param {'active' | 'passive'} location
    * @param {number} pokemonPos
    * @param {number} movePos
    */
   getMove(state, id, location, pokemonPos, movePos) {
-    state = state || this.state;
-    return this.state.players[id - 1][location][pokemonPos - 1].moves[movePos - 1];
+    return state.players[id - 1][location][pokemonPos - 1].moves[movePos - 1];
   }
 
   /**
@@ -633,8 +633,7 @@ class Battle {
    * @param {number} pos
    */
   getAction(state, id, pos) {
-    state = state || this.state;
-    return this.state.players[id - 1].actions[pos - 1];
+    return state.players[id - 1].actions[pos - 1];
   }
 
   /**
@@ -682,7 +681,7 @@ class Battle {
    */
   commitActions() {
     // Check if commands are complete
-    if (this.getSlotsMissingAction(null).length > 0) { return; }
+    if (this.getSlotsMissingAction().length > 0) { return; }
     // Execute commands
     this.dispatch('beginRun');
   }
@@ -719,10 +718,10 @@ class Battle {
    * Responds to the execute action event.
    * @private
    * @param {State} state
-   * @param {number} id
-   * @param {number} pos
    */
-  onExecuteAction(state, id, pos) {
+  onExecuteAction(state) {
+    const position = this.getNextActionPosition(state);
+    const { id, pos } = position;
     const action = this.getAction(state, id, pos);
     if (action.type === 'switch') {
       this.executeSwitch(state, id, pos, action.passive);
@@ -747,6 +746,8 @@ class Battle {
     // FIXME: do some cleanup like clear volatiles, boosts, etc.
     this.setPokemon(state, id, 'active', activePos, passive);
     this.setPokemon(state, id, 'passive', passivePos, active);
+    state.players[id - 1].forcedSwitches = state.players[id - 1].forcedSwitches.filter(item => item !== activePos);
+    state.players[id - 1].actions[activePos - 1] = null;
     state.players[id - 1].passive.sort((a, b) => {
       if ((a === null && b === null) || (a !== null && b !== null)) {
         return 0;
@@ -765,7 +766,6 @@ class Battle {
    * @param {number} id
    */
   getFirstEmptyPassivePosition(state, id) {
-    state = state || this.state;
     for (const pos of range(1, this.format.total)) {
       if (state.players[id - 1].passive[pos - 1] === null) {
         return pos;
@@ -783,7 +783,6 @@ class Battle {
    * @param {'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'accuracy' | 'evasion'} key
    */
   getBoost(state, id, pos, key) {
-    state = state || this.state;
     return state.players[id - 1].active[pos - 1].boosts[key];
   }
 
@@ -796,7 +795,6 @@ class Battle {
    * @param {'atk' | 'def' | 'spa' | 'spd' | 'spe'} key
    */
   getBoostedStat(state, id, pos, key) {
-    state = state || this.state;
     const stat = state.players[id - 1].active[pos - 1].stats[key];
     const boost = this.getBoost(state, id, pos, key);
     return getBoostedValue(key, boost, stat);
@@ -970,7 +968,6 @@ class Battle {
    * @returns {Position[]}
    */
   getSlotsContainingAction(state) {
-    state = state || this.state;
     return this.getActivePositions()
       .filter(({ id, pos }) => {
         return this.getAction(state, id, pos) !== null;
@@ -979,8 +976,8 @@ class Battle {
 
   /**
    * Gets all active slots missing an action.
-   * @private
-   * @param {State} state
+   * @public
+   * @param {State} [state]
    * @returns {Position[]}
    */
   getSlotsMissingAction(state) {
@@ -997,7 +994,6 @@ class Battle {
    * @param {State} state
    */
   getOccupiedActivePositions(state) {
-    state = state || this.state;
     return this.getActivePositions()
       .filter(({ id, pos }) => !!this.getPokemon(state, id, 'active', pos));
   }
@@ -1045,6 +1041,17 @@ class Battle {
       // Volatiles
       // FIXME: implement this
     }
+  }
+
+  /**
+   * Gets whether a player still has forced switched left to make.
+   * @public
+   * @param {State} state
+   * @param {number} id
+   */
+  hasForcedSwitchesLeft(state, id) {
+    state = state || this.state;
+    return state.players[id - 1].forcedSwitches.length > 0;
   }
 }
 

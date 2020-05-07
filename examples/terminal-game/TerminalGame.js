@@ -171,9 +171,9 @@ class TerminalGame {
         throw new Error('Only move, switch and show are recognized commands');
       }
       if (
-        this.battle.getSlotsMissingAction(null).find(item => item.id === player.id) &&
-        turn === this.battle.getTurn(null) &&
-        phase === this.battle.getPhase(null)
+        this.battle.getSlotsMissingAction().find(item => item.id === player.id) &&
+        turn === this.battle.getTurn() &&
+        phase === this.battle.getPhase()
       ) {
         return true;
       }
@@ -196,7 +196,7 @@ class TerminalGame {
       } else {
         throw new Error('Only switch and show are recognized commands');
       }
-      if (this.battle.hasForcedSwitchesLeft(player.id)) {
+      if (this.battle.hasForcedSwitchesLeft(null, player.id)) {
         return true;
       }
     });
