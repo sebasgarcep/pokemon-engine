@@ -1,3 +1,4 @@
+const PokemonStateFactory = require('../battle/PokemonStateFactory');
 const pokemonData = require('./pokemon');
 
 /**
@@ -43,8 +44,8 @@ const items = {
       },
       onBeforeDamageApplication: null,
       onAfterAttack: (state, entity, opts) => {
-        if (entity.id === opts.active.id) {
-          entity.hp = Math.max(0, entity.maxhp - Math.floor(entity.maxhp / 10));
+        if (entity.id === opts.active.id && opts.didDamage) {
+          PokemonStateFactory.subtractHp(entity, entity.maxhp / 10);
         }
       },
     },

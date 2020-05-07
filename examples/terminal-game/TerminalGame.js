@@ -153,8 +153,8 @@ class TerminalGame {
   }
 
   onMove(move, change, player, rival, field) {
-    const turn = this.battle.getTurn(null);
-    const phase = this.battle.getPhase(null);
+    const turn = this.battle.getTurn();
+    const phase = this.battle.getPhase();
     const playerActiveMessage = player.active.map(item => this.formatPokemonState(item)).join(' / ');
     const rivalActiveMessage = rival.active.map(item => this.formatPokemonState(item)).join(' / ');
     let message = `p${player.id} team: ${playerActiveMessage}\n`;

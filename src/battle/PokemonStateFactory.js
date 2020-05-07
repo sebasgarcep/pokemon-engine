@@ -97,6 +97,16 @@ class PokemonStateFactory {
       volatiles: {},
     };
   }
+
+  /**
+   * Subtracts from a Pokemon's HP.
+   * @param {PokemonState} state
+   * @param {number} damage
+   */
+  static subtractHp(state, damage) {
+    damage = Math.max(1, Math.floor(damage));
+    state.hp = Math.max(0, state.hp - damage);
+  }
 }
 
 module.exports = PokemonStateFactory;

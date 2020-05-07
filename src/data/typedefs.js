@@ -1,6 +1,7 @@
 
 /**
  * @typedef {Object} Hooks
+ * @property {Function} onActive
  * @property {Function} onBeforeDamageCalculation
  * @property {Function} onBeforeDamageApplication
  * @property {Function} onAfterAttack
@@ -108,6 +109,13 @@
  * @property {string} name
  * @property {number} num
  * @property {string} desc
+ * @property {Hooks} hooks
+ */
+
+/**
+ * @typedef {Object} Weather
+ * @property {string} id
+ * @property {string} name
  * @property {Hooks} hooks
  */
 

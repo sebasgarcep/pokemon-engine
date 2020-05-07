@@ -2,6 +2,8 @@
  * @typedef {import('./typedefs').Ability} Ability
  */
 
+const FieldStateFactory = require('../battle/FieldStateFactory');
+
 /**
  * @type {Object<string, Ability>}
  */
@@ -22,7 +24,9 @@ const abilities = {
     num: 70,
     desc: 'On switch-in, this Pokemon summons Sunny Day.',
     hooks: {
-
+      onActive: (state, entity) => {
+        FieldStateFactory.setWeather(state, 'harshsunlight', 5);
+      },
     },
   },
   ironfist: {
@@ -49,7 +53,9 @@ const abilities = {
     num: 22,
     desc: 'On switch-in, this Pokemon lowers the Attack of adjacent opponents by 1 stage.',
     hooks: {
+      onActive: (state, entity) => {
 
+      }
     },
   },
   frisk: {

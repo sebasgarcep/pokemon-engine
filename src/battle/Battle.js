@@ -1,4 +1,5 @@
 /**
+ * @typedef {import('./FieldStateFactory').FieldState} FieldState
  * @typedef {import('./PokemonStateFactory').PokemonBuild} PokemonBuild
  * @typedef {import('./PokemonStateFactory').PokemonState} PokemonState
  */
@@ -13,11 +14,13 @@ const seedrandom = require('seedrandom');
 const range = require('lodash.range');
 const { produce, setAutoFreeze } = require('immer');
 const PokemonStateFactory = require('./PokemonStateFactory');
+const FieldStateFactory = require('./FieldStateFactory');
 const abilityData = require('../data/abilities');
 const itemData = require('../data/items');
 const moveData = require('../data/moves');
 const pokemonData = require('../data/pokemon');
 const typechartData = require('../data/typechart');
+const weatherData = require('../data/weathers');
 const getBoostedValue = require('../utils/getBoostedValue');
 
 // Setting to avoid mistakes during development and testing.
@@ -45,10 +48,6 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
  */
 
 /**
- * @typedef {Object} FieldState
- */
-
-/**
  * @typedef {Object} Position
  * @property {number} id
  * @property {number} pos
@@ -69,7 +68,7 @@ const initalState = {
   phase: 'setplayers',
   turn: 0,
   players: [],
-  field: null,
+  field: FieldStateFactory.create(),
   order: [],
   seed: null,
 };
@@ -147,6 +146,32 @@ class Battle {
       for (const id of this.getIds()) {
         state.players[id - 1].forcedSwitches = forcedSwitches[id - 1];
       }
+    } else if (type === 'executeForcedSwitches') {
+      const [id] = args;
+      this.onExecuteForcedSwitches(state, id);
+    }
+  }
+
+  /**
+   * Reponds to the execute forced switches event.
+   * @private
+   * @param {State} state
+   * @param {number} id
+   */
+  onExecuteForcedSwitches(state, id) {
+    const shouldExecuteForcedSwitches = state.players[id - 1]
+      .forcedSwitches
+      .every(pos => {
+        const action = this.getAction(state, id, pos);
+        return !!action && action.type === 'switch';
+      });
+    if (shouldExecuteForcedSwitches) {
+      for (const pos of state.players[id - 1].forcedSwitches) {
+        const action = this.getAction(state, id, pos);
+        // @ts-ignore
+        this.executeSwitch(state, id, pos, action.passive);
+      }
+      this.sortPassive(state, id);
     }
   }
 
@@ -296,6 +321,8 @@ class Battle {
       actions: null,
       forcedSwitches: null,
     });
+
+    state.field.sides.push({});
   }
 
   /**
@@ -420,6 +447,7 @@ class Battle {
   /**
    * Responds to the select event.
    * @private
+   * @param {State} state
    * @param {number} id
    * @param {number[]} choices
    */
@@ -428,17 +456,14 @@ class Battle {
     if (choices.length !== this.format.total) {
       throw new Error(`You must select exactly ${this.format.total} pokemon.`);
     }
+    const positions = range(1, this.format.active + 1);
     const builds = this.state.players[id - 1].builds;
-    const team = choices.map(index => PokemonStateFactory.create(id, builds[index - 1]));
-    const active = team.slice(0, this.format.active);
-    const passive = [
-      ...team.slice(this.format.active, this.format.total),
-      ...range(this.format.active).map(() => null),
-    ];
+    const active = positions.map(() => null);
+    const passive = choices.map(index => PokemonStateFactory.create(id, builds[index - 1]));
     state.players[id - 1].active = active;
     state.players[id - 1].passive = passive;
-    state.players[id - 1].actions = active.map(() => null);
-    state.players[id - 1].forcedSwitches = [];
+    state.players[id - 1].actions = positions.map(pos => ({ type: 'switch', passive: pos }));
+    state.players[id - 1].forcedSwitches = positions;
   }
 
   /**
@@ -458,10 +483,11 @@ class Battle {
     const rng = seedrandom('test_seed', { state: true });
     const seed = rng.state();
     state.seed = seed;
-    state.field = {
-      global: {},
-      sides: this.getIds().map(() => ({})),
-    };
+    // Bring out leading Pokemon
+    for (const id of this.getIds()) {
+      this.onExecuteForcedSwitches(state, id);
+    }
+    // Start next turn
     this.setNextTurn(state);
   }
 
@@ -471,8 +497,6 @@ class Battle {
    * @param {State} state
    */
   setNextTurn(state) {
-    state.phase = 'choice';
-    state.turn += 1;
     // Clean up actions
     const activeIds = this.getActivePositions();
     for (const { id, pos } of activeIds) {
@@ -482,6 +506,12 @@ class Battle {
         this.clearAction(state, id, pos);
       }
     }
+    // Update turns left
+    // FIXME: tick down turns left
+    // FIXME: trigger on end turn
+    // Update turn
+    state.phase = 'choice';
+    state.turn += 1;
   }
 
   /**
@@ -545,7 +575,6 @@ class Battle {
     this.setAction(id, activePos, { type: 'move', move: movePos, target: targetPos });
   }
 
-  // TODO: Solve this last
   // FIXME: missing more checks
   /**
    * Switches pokemon between active and passive slots.
@@ -571,7 +600,7 @@ class Battle {
       }
     }
     this.setAction(id, activePos, { type: 'switch', passive: passivePos });
-    if (this.state.phase === 'run') { this.dispatch('executeAction'); }
+    if (this.state.phase === 'run') { this.dispatch('executeForcedSwitches', id); }
   }
 
   // TODO: Solve this
@@ -742,7 +771,11 @@ class Battle {
    * @param {number} passivePos
    */
   executeSwitch(state, id, activePos, passivePos) {
-    if (passivePos === 0) { passivePos = this.getFirstEmptyPassivePosition(state, id); }
+    let shouldSort = false;
+    if (passivePos === 0) {
+      shouldSort = true;
+      passivePos = this.getFirstEmptyPassivePosition(state, id);
+    }
     const active = this.getPokemon(state, id, 'active', activePos);
     const passive = this.getPokemon(state, id, 'passive', passivePos);
     // FIXME: do some cleanup like clear volatiles, boosts, etc.
@@ -750,14 +783,19 @@ class Battle {
     this.setPokemon(state, id, 'passive', passivePos, active);
     state.players[id - 1].forcedSwitches = state.players[id - 1].forcedSwitches.filter(item => item !== activePos);
     state.players[id - 1].actions[activePos - 1] = null;
+    if (shouldSort) { this.sortPassive(state, id); }
+    this.triggerHooks('onActive', state, passive);
+  }
+
+  /**
+   * Sorts the passive Pokemon of a player.
+   * @private
+   * @param {State} state
+   * @param {number} id
+   */
+  sortPassive(state, id) {
     state.players[id - 1].passive.sort((a, b) => {
-      if ((a === null && b === null) || (a !== null && b !== null)) {
-        return 0;
-      } else if (a === null) {
-        return 1;
-      } else {
-        return -1;
-      }
+      return Number(!!b) - Number(!!a);
     });
   }
 
@@ -768,7 +806,7 @@ class Battle {
    * @param {number} id
    */
   getFirstEmptyPassivePosition(state, id) {
-    for (const pos of range(1, this.format.total)) {
+    for (const pos of range(1, this.format.total + 1)) {
       if (state.players[id - 1].passive[pos - 1] === null) {
         return pos;
       }
@@ -916,7 +954,6 @@ class Battle {
     if (stabModifier) { opts.damage *= 1.5; }
     opts.damage *= Math.pow(2, opts.typeModifier);
     opts.damage *= opts.randomModifier / 100;
-    opts.damage = Math.max(1, Math.floor(opts.damage));
     // FIXME: implement other modifiers (Crit, Hooks, etc.)
     return opts;
   }
@@ -924,6 +961,7 @@ class Battle {
   /**
    * Executes a move's efects.
    * @private
+   * @param {State} state
    * @param {number} id
    * @param {number} pos
    * @param {number} movePos
@@ -939,6 +977,7 @@ class Battle {
     const targetPositions = this.getTargetPositions(state, id, move.target, targetPos);
     // Execute each move
     const active = this.getPokemon(state, id, 'active', pos);
+    const attackOpts = { active, didDamage: false };
     for (const { id: targetId, pos: targetPos } of targetPositions) {
       const accuracy = this.getAccuracy(state, id, pos, move, targetId, targetPos);
       const hitValue = this.getRandom(state, 1, 100);
@@ -950,30 +989,16 @@ class Battle {
       const damageOpts = this.getDamage(state, id, pos, active, move, targetId, targetPos, target);
       if (damageOpts !== null) {
         this.triggerHooks('onBeforeDamageApplication', state, damageOpts);
-        target.hp = Math.max(0, target.hp - damageOpts.damage);
+        attackOpts.didDamage = true;
+        PokemonStateFactory.subtractHp(target, damageOpts.damage);
       }
       if (target.hp > 0) {
         // FIXME: trigger secondary effects
       } else {
         this.executeSwitch(state, targetId, targetPos, 0);
       }
-      if (damageOpts !== null) {
-        this.triggerHooks('onAfterAttack', state, damageOpts);
-      }
     }
-  }
-
-  /**
-   * Gets all active slots containing an action.
-   * @private
-   * @param {State} state
-   * @returns {Position[]}
-   */
-  getSlotsContainingAction(state) {
-    return this.getActivePositions()
-      .filter(({ id, pos }) => {
-        return this.getAction(state, id, pos) !== null;
-      });
+    this.triggerHooks('onAfterAttack', state, attackOpts);
   }
 
   /**
@@ -1010,7 +1035,8 @@ class Battle {
       .map(item => {
         const speed = this.getBoostedStat(state, item.id, item.pos, 'spe');
         // FIXME: do some speed modifications here, like trick room
-        return { ...item, speed, randomFactor: this.getRandom(state, 1, 1000) };
+        const randomFactor = this.getRandom(state, 1, 1000);
+        return { ...item, speed, randomFactor };
       })
       .filter(item => item !== null)
       .sort((a, b) => b.speed - a.speed || b.randomFactor - a.randomFactor);
@@ -1026,6 +1052,10 @@ class Battle {
    */
   triggerHooks(hookName, state, ...args) {
     // Field
+    if (state.field.global.weather) {
+      const weatherHook = weatherData[state.field.global.weather.id].hooks[hookName];
+      if (weatherHook) { weatherHook(state, ...args); }
+    }
     // FIXME: do this
     const activePositions = this.getActivePositions();
     // FIXME: use speed order
