@@ -59,7 +59,7 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
  * @property {number} turn
  * @property {PlayerState[]} players
  * @property {FieldState} field
- * @property {Position[]} order
+ * @property {{ id: number, pos: number, speed: number, randomFactor: number }[]} order
  * @property {any} seed
  */
 
@@ -738,9 +738,16 @@ class Battle {
         else if (bAction.type === 'switch') { bTier = 2; }
         else { bTier = 3; }
         if (aTier !== bTier) { return aTier - bTier; }
-        if (aTier !== 3) { return 0; }
-        // FIXME: use priority / order to get next move
-        return 0;
+        if (aAction.type !== 'move' || bAction.type !== 'move') { return 0; }
+        const aMove = this.getMove(state, aPosition.id, 'active', aPosition.pos, aAction.move);
+        const bMove = this.getMove(state, bPosition.id, 'active', bPosition.pos, bAction.move);
+        const aPriority = moveData[aMove.id].priority;
+        const bPriority = moveData[bMove.id].priority;
+        if (aPriority !== bPriority) { return bPriority - aPriority; }
+        const aItem = state.order.find(item => item.id === aPosition.id && item.pos === aPosition.pos);
+        const bItem = state.order.find(item => item.id === bPosition.id && item.pos === bPosition.pos);
+        if (aItem.speed !== bItem.speed) { return bItem.speed - aItem.speed; }
+        return bItem.randomFactor - aItem.randomFactor;
       });
     return activePositions[0];
   }
