@@ -336,10 +336,10 @@ class Battle {
   getRandom(state, min, max) {
     const { seed } = state;
     if (seed === null) { throw new Error('Seed has not been initialized,'); }
-    const rng = seedrandom('', { state:seed });
+    const rng = seedrandom('', { state: seed });
     const value = rng();
     const range = max - min + 1;
-    state.seed = seed;
+    state.seed = rng.state();
     return Math.floor(range * value) + min;
   }
 
