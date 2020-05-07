@@ -12,7 +12,7 @@
  * @property {boolean} disabled
  */
 
-class MoveStateFactory {
+class MoveStateController {
   /**
    * Creates a Move State.
    * @param {MoveBuild} build
@@ -28,4 +28,4 @@ class MoveStateFactory {
   }
 }
 
-module.exports = MoveStateFactory;
+module.exports = MoveStateController;

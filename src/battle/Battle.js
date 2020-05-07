@@ -1,7 +1,7 @@
 /**
- * @typedef {import('./FieldStateFactory').FieldState} FieldState
- * @typedef {import('./PokemonStateFactory').PokemonBuild} PokemonBuild
- * @typedef {import('./PokemonStateFactory').PokemonState} PokemonState
+ * @typedef {import('./FieldStateController').FieldState} FieldState
+ * @typedef {import('./PokemonStateController').PokemonBuild} PokemonBuild
+ * @typedef {import('./PokemonStateController').PokemonState} PokemonState
  */
 
 /**
@@ -13,8 +13,8 @@
 const seedrandom = require('seedrandom');
 const range = require('lodash.range');
 const { produce, setAutoFreeze } = require('immer');
-const PokemonStateFactory = require('./PokemonStateFactory');
-const FieldStateFactory = require('./FieldStateFactory');
+const PokemonStateController = require('./PokemonStateController');
+const FieldStateController = require('./FieldStateController');
 const abilityData = require('../data/abilities');
 const itemData = require('../data/items');
 const moveData = require('../data/moves');
@@ -68,7 +68,7 @@ const initalState = {
   phase: 'setplayers',
   turn: 0,
   players: [],
-  field: FieldStateFactory.create(),
+  field: FieldStateController.create(),
   order: [],
   seed: null,
 };
@@ -459,7 +459,7 @@ class Battle {
     const positions = range(1, this.format.active + 1);
     const builds = this.state.players[id - 1].builds;
     const active = positions.map(() => null);
-    const passive = choices.map(index => PokemonStateFactory.create(id, builds[index - 1]));
+    const passive = choices.map(index => PokemonStateController.create(id, builds[index - 1]));
     state.players[id - 1].active = active;
     state.players[id - 1].passive = passive;
     state.players[id - 1].actions = positions.map(pos => ({ type: 'switch', passive: pos }));
@@ -997,7 +997,7 @@ class Battle {
       if (damageOpts !== null) {
         this.triggerHooks('onBeforeDamageApplication', state, damageOpts);
         attackOpts.didDamage = true;
-        PokemonStateFactory.subtractHp(target, damageOpts.damage);
+        PokemonStateController.subtractHp(target, damageOpts.damage);
       }
       if (target.hp > 0) {
         // FIXME: trigger secondary effects

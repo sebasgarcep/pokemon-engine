@@ -1,5 +1,5 @@
 /**
- * @typedef {import('../battle/Battle').State} State
+ * @typedef {import('./Battle').State} State
  */
 
 /**
@@ -24,7 +24,7 @@
  * @typedef {Object} SideFieldState
  */
 
-class FieldStateFactory {
+class FieldStateController {
   /**
    * Creates a field state.
    * @returns {FieldState}
@@ -50,4 +50,4 @@ class FieldStateFactory {
   }
 }
 
-module.exports = FieldStateFactory;
+module.exports = FieldStateController;

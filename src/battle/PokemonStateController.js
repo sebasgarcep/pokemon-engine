@@ -1,13 +1,13 @@
 /**
  * @typedef {import('../data/typedefs').Boosts} Boosts
  * @typedef {import('../data/typedefs').Spread} Spread
- * @typedef {import('./ItemStateFactory').ItemState} ItemState
- * @typedef {import('./MoveStateFactory').MoveBuild} MoveBuild
- * @typedef {import('./MoveStateFactory').MoveState} MoveState
+ * @typedef {import('./ItemStateController').ItemState} ItemState
+ * @typedef {import('./MoveStateController').MoveBuild} MoveBuild
+ * @typedef {import('./MoveStateController').MoveState} MoveState
  */
 
-const ItemStateFactory = require('./ItemStateFactory');
-const MoveStateFactory = require('./MoveStateFactory');
+const ItemStateController = require('./ItemStateController');
+const MoveStateController = require('./MoveStateController');
 
 const pokemon = require('../data/pokemon');
 const natures = require('../data/natures');
@@ -42,7 +42,7 @@ const natures = require('../data/natures');
  * @property {Object<string, any>} volatiles
  */
 
-class PokemonStateFactory {
+class PokemonStateController {
   static getStats(build) {
     /**
      * Calculates the final stats before boosts for a Pokemon.
@@ -71,7 +71,7 @@ class PokemonStateFactory {
 
 
   static getMoves(build) {
-    return build.moves.map(item => MoveStateFactory.create(item));
+    return build.moves.map(item => MoveStateController.create(item));
   }
 
   /**
@@ -81,15 +81,15 @@ class PokemonStateFactory {
    * @returns {PokemonState}
    */
   static create(id, build) {
-    const moves = PokemonStateFactory.getMoves(build);
-    const stats = PokemonStateFactory.getStats(build);
+    const moves = PokemonStateController.getMoves(build);
+    const stats = PokemonStateController.getStats(build);
     return {
       id: `${id}: ${build.species}`,
       build,
       moves,
       ability: build.ability,
       stats,
-      item: ItemStateFactory.create(build.item),
+      item: ItemStateController.create(build.item),
       hp: stats.hp,
       maxhp: stats.hp,
       boosts: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 },
@@ -109,4 +109,4 @@ class PokemonStateFactory {
   }
 }
 
-module.exports = PokemonStateFactory;
+module.exports = PokemonStateController;

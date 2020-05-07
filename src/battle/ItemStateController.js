@@ -4,7 +4,7 @@
  * @property {number} uses
  */
 
-class ItemStateFactory {
+class ItemStateController {
   /**
    * Creates an Item state.
    * @param {string} id
@@ -15,4 +15,4 @@ class ItemStateFactory {
   }
 }
 
-module.exports = ItemStateFactory;
+module.exports = ItemStateController;
