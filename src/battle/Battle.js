@@ -1,6 +1,8 @@
 /**
- * @typedef {import('./FieldStateController').FieldState} FieldState
- * @typedef {import('./PokemonStateController').PokemonBuild} PokemonBuild
+ * @typedef {import('./BattleStateController').Action} Action
+ * @typedef {import('./BattleStateController').Phase} Phase
+ * @typedef {import('./BattleStateController').Position} Position
+ * @typedef {import('./BattleStateController').BattleState} BattleState
  * @typedef {import('./PokemonStateController').PokemonState} PokemonState
  */
 
@@ -13,8 +15,9 @@
 const seedrandom = require('seedrandom');
 const range = require('lodash.range');
 const { produce, setAutoFreeze } = require('immer');
+const BattleStateController = require('./BattleStateController');
+const PlayerStateController = require('./PlayerStateController');
 const PokemonStateController = require('./PokemonStateController');
-const FieldStateController = require('./FieldStateController');
 const abilityData = require('../data/abilities');
 const itemData = require('../data/items');
 const moveData = require('../data/moves');
@@ -26,59 +29,13 @@ const getBoostedValue = require('../utils/getBoostedValue');
 // Setting to avoid mistakes during development and testing.
 setAutoFreeze(process.env.NODE_ENV !== 'production');
 
-/**
- * @typedef {'setplayers' | 'teampreview' | 'choice' | 'run' | 'end'} Phase
- */
-
-/**
- * @typedef {{ type: 'pass' }} PassAction
- * @typedef {{ type: 'switch', passive: number }} SwitchAction
- * @typedef {{ type: 'move', move: number, target: number }} MoveAction
- * @typedef {PassAction | SwitchAction | MoveAction} Action
- */
-
-/**
- * @typedef {Object} PlayerState
- * @property {number} id
- * @property {PokemonBuild[]} builds
- * @property {PokemonState[]} active
- * @property {PokemonState[]} passive
- * @property {(Action | null)[]} actions
- * @property {number[]} forcedSwitches
- */
-
-/**
- * @typedef {Object} Position
- * @property {number} id
- * @property {number} pos
- */
-
-/**
- * @typedef {Object} State
- * @property {Phase} phase
- * @property {number} turn
- * @property {PlayerState[]} players
- * @property {FieldState} field
- * @property {{ id: number, pos: number, speed: number, randomFactor: number }[]} order
- * @property {any} seed
- */
-
-/** @type {State} */
-const initalState = {
-  phase: 'setplayers',
-  turn: 0,
-  players: [],
-  field: FieldStateController.create(),
-  order: [],
-  seed: null,
-};
+const initalState = BattleStateController.create();
 
 class Battle {
   constructor({ hooks = [], state = initalState, format = 'doubles' } = {}) {
     // attributes
     /** @private */
     this.hooks = hooks;
-    /** @type {State} */
     this.state = state;
     if (format === 'doubles') {
       this.format = { id: format, active: 2, total: 4 };
@@ -114,7 +71,7 @@ class Battle {
   /**
    * In charge of managing all updates to the state.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {string} type
    * @param  {...any} args
    */
@@ -155,7 +112,7 @@ class Battle {
   /**
    * Reponds to the execute forced switches event.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    */
   onExecuteForcedSwitches(state, id) {
@@ -178,8 +135,8 @@ class Battle {
   /**
    * In charge of triggering side effects according to state changes.
    * @private
-   * @param {State} state
-   * @param {State} prevState
+   * @param {BattleState} state
+   * @param {BattleState} prevState
    */
   triggerSideEffects(state, prevState) {
     if (prevState.phase === 'setplayers' && state.phase === 'teampreview') {
@@ -216,8 +173,8 @@ class Battle {
   /**
    * Triggers onForceSwitch hook.
    * @private
-   * @param {State} state
-   * @param {State} prevState
+   * @param {BattleState} state
+   * @param {BattleState} prevState
    */
   triggerOnForceSwitch(state, prevState) {
     for (const id of this.getIds()) {
@@ -292,7 +249,7 @@ class Battle {
   /**
    * Responds to a set player event.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {any} builds
    * @param {any} onTeamPreview
    * @param {any} onMove
@@ -312,23 +269,14 @@ class Battle {
     };
 
     this.hooks.push(opts);
-
-    state.players.push({
-      id,
-      builds,
-      active: null,
-      passive: null,
-      actions: null,
-      forcedSwitches: null,
-    });
-
+    state.players.push(PlayerStateController.create(id, builds));
     state.field.sides.push({});
   }
 
   /**
    * Gets a random integer in the range [min, max].
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} min
    * @param {number} max
    * @returns {number}
@@ -374,7 +322,7 @@ class Battle {
   /**
    * Gets a battle's current turn.
    * @public
-   * @param {State} [state]
+   * @param {BattleState} [state]
    * @returns {number}
    */
   getTurn(state) {
@@ -385,7 +333,7 @@ class Battle {
   /**
    * Gets a battle's current phase.
    * @public
-   * @param {State} [state]
+   * @param {BattleState} [state]
    * @returns {Phase}
    */
   getPhase(state) {
@@ -396,7 +344,7 @@ class Battle {
   /**
    * Gets player's battle state.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} playerId
    */
   getCompletePlayerState(state, playerId) {
@@ -427,7 +375,7 @@ class Battle {
   /**
    * Responds to the start event.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   onStart(state) {
     if (this.state.players.length < 2) { throw new Error('Both players must be set for the battle to begin.'); }
@@ -447,7 +395,7 @@ class Battle {
   /**
    * Responds to the select event.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number[]} choices
    */
@@ -494,7 +442,7 @@ class Battle {
   /**
    * Sets the next turn's start.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   setNextTurn(state) {
     // Clean up actions
@@ -517,7 +465,7 @@ class Battle {
   /**
    * Triggers onMove hooks.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   triggerOnMove(state) {
     const ids = this.getIds();
@@ -620,7 +568,7 @@ class Battle {
   /**
    * Gets a Pokemon from a certain slot.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {'active' | 'passive'} location
    * @param {number} pos
@@ -632,7 +580,7 @@ class Battle {
   /**
    * Gets a Pokemon from a certain slot.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {'active' | 'passive'} location
    * @param {number} pos
@@ -645,7 +593,7 @@ class Battle {
   /**
    * Returns a move at a particular location.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {'active' | 'passive'} location
    * @param {number} pokemonPos
@@ -658,7 +606,7 @@ class Battle {
   /**
    * Gets the action associated with a player and an active position.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    */
@@ -669,7 +617,7 @@ class Battle {
   /**
    * Sets an action in place.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    * @param {Action} action
@@ -681,7 +629,7 @@ class Battle {
   /**
    * Clears an action slot.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    */
@@ -708,7 +656,7 @@ class Battle {
   /**
    * Detects whether all actions have been set and responds accordingly.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   commitActions(state) {
     // Check if commands are complete
@@ -720,7 +668,7 @@ class Battle {
   /**
    * Returns the next action to be executed for a given type.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   getNextActionPosition(state) {
     const activePositions = this.getActivePositions()
@@ -755,7 +703,7 @@ class Battle {
   /**
    * Responds to the execute action event.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   onExecuteAction(state) {
     const position = this.getNextActionPosition(state);
@@ -772,7 +720,7 @@ class Battle {
   /**
    * Switches two pokemon.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} activePos
    * @param {number} passivePos
@@ -797,7 +745,7 @@ class Battle {
   /**
    * Sorts the passive Pokemon of a player.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    */
   sortPassive(state, id) {
@@ -809,7 +757,7 @@ class Battle {
   /**
    * Gets the number for the first unoccupied passive position.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    */
   getFirstEmptyPassivePosition(state, id) {
@@ -824,7 +772,7 @@ class Battle {
   /**
    * Gets a boost for a corresponding stat.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    * @param {'atk' | 'def' | 'spa' | 'spd' | 'spe' | 'accuracy' | 'evasion'} key
@@ -836,7 +784,7 @@ class Battle {
   /**
    * Gets a stat taking into account boosts.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    * @param {'atk' | 'def' | 'spa' | 'spd' | 'spe'} key
@@ -850,7 +798,7 @@ class Battle {
   /**
    * Gets all target positions targeted by a move.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {string} target
    * @param {number} pos
@@ -878,7 +826,7 @@ class Battle {
   /**
    * Gets the accuracy for a move.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    * @param {any} move
@@ -900,7 +848,7 @@ class Battle {
   /**
    * Gets damage from a move.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    * @param {PokemonState} active
@@ -968,7 +916,7 @@ class Battle {
   /**
    * Executes a move's efects.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    * @param {number} pos
    * @param {number} movePos
@@ -1011,7 +959,7 @@ class Battle {
   /**
    * Gets all active slots missing an action.
    * @public
-   * @param {State} [state]
+   * @param {BattleState} [state]
    * @returns {Position[]}
    */
   getSlotsMissingAction(state) {
@@ -1025,7 +973,7 @@ class Battle {
   /**
    * Gets all active positions currently occupied.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   getOccupiedActivePositions(state) {
     return this.getActivePositions()
@@ -1035,7 +983,7 @@ class Battle {
   /**
    * Sets a move order for the Pokemon left to move.
    * @private
-   * @param {State} state
+   * @param {BattleState} state
    */
   setOrder(state) {
     const order = this.getOccupiedActivePositions(state)
@@ -1054,7 +1002,7 @@ class Battle {
    * Triggers all hooks of a given type.
    * @private
    * @param {string} hookName
-   * @param {State} state
+   * @param {BattleState} state
    * @param  {any[]} args
    */
   triggerHooks(hookName, state, ...args) {
@@ -1085,7 +1033,7 @@ class Battle {
   /**
    * Gets whether a player still has forced switched left to make.
    * @public
-   * @param {State} state
+   * @param {BattleState} state
    * @param {number} id
    */
   hasForcedSwitchesLeft(state, id) {

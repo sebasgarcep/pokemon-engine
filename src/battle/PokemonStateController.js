@@ -76,7 +76,7 @@ class PokemonStateController {
 
   /**
    * Creates a Pokemon state from a Pokemon build.
-   * @param {any} id
+   * @param {number} id
    * @param {PokemonBuild} build
    * @returns {PokemonState}
    */
