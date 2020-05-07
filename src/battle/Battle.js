@@ -738,7 +738,7 @@ class Battle {
         else if (bAction.type === 'switch') { bTier = 2; }
         else { bTier = 3; }
         if (aTier !== bTier) { return aTier - bTier; }
-        if (aAction.type !== 'move' || bAction.type !== 'move') { return 0; }
+        if (!aAction || !bAction || aAction.type !== 'move' || bAction.type !== 'move') { return 0; }
         const aMove = this.getMove(state, aPosition.id, 'active', aPosition.pos, aAction.move);
         const bMove = this.getMove(state, bPosition.id, 'active', bPosition.pos, bAction.move);
         const aPriority = moveData[aMove.id].priority;
