@@ -11,7 +11,7 @@ const weathers = {
     name: 'Harsh Sunlight',
     hooks: {
       onActive: null,
-      onBeforeDamageCalculation: (state, entity, opts) => {
+      onBeforeDamageCalculation: (state, opts) => {
         if (opts.move.type === 'fire') {
           opts.power *= 1.5;
         }
