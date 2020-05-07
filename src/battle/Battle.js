@@ -1,4 +1,9 @@
 /**
+ * @typedef {import('./PokemonStateFactory').PokemonBuild} PokemonBuild
+ * @typedef {import('./PokemonStateFactory').PokemonState} PokemonState
+ */
+
+/**
  * FIXME: keep like an event log that details all events that happen and
  * use a hook to report them to players. This will be useful when building
  * an information model.
@@ -36,9 +41,9 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
 /**
  * @typedef {Object} PlayerState
  * @property {string} id
- * @property {any[]} builds
- * @property {any[]} active
- * @property {any[]} passive
+ * @property {PokemonBuild[]} builds
+ * @property {PokemonState[]} active
+ * @property {PokemonState[]} passive
  * @property {(Action | null)[]} actions
  * @property {number[]} forcedSwitches
  */
