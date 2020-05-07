@@ -42,7 +42,6 @@ setAutoFreeze(process.env.NODE_ENV !== 'production');
  * @property {PokemonState[]} passive
  * @property {(Action | null)[]} actions
  * @property {number[]} forcedSwitches
- * @property {boolean} waitingInput
  */
 
 /**
@@ -143,9 +142,6 @@ class Battle {
       this.onExecuteAction(state);
     } else if (type === 'startNextTurn') {
       this.setNextTurn(state);
-    } else if (type === 'setWaitingInput') {
-      const [id] = args;
-      state.players[id - 1].waitingInput = true;
     } else if (type === 'setForcedSwitches') {
       const [forcedSwitches] = args;
       for (const id of this.getIds()) {
@@ -172,15 +168,15 @@ class Battle {
       }
     }
     if (prevState.turn !== state.turn) {
-      this.triggerOnMove();
+      this.triggerOnMove(state);
     }
     if (state.phase === 'choice') {
-      this.commitActions();
+      this.commitActions(state);
     }
     if (state.phase === 'run') {
       const shouldTriggerForcedSwitches = !!this.state.players.find(item => item.forcedSwitches.length > 0);
       if (shouldTriggerForcedSwitches) {
-        this.triggerOnForceSwitch();
+        this.triggerOnForceSwitch(state, prevState);
       } else {
         const shouldExecuteAction = this.state.players.find(item => item.actions.find(action => !!action));
         if (shouldExecuteAction) {
@@ -195,13 +191,17 @@ class Battle {
   /**
    * Triggers onForceSwitch hook.
    * @private
+   * @param {State} state
+   * @param {State} prevState
    */
-  triggerOnForceSwitch() {
-    for (const item of this.state.players) {
-      if (!item.waitingInput && item.forcedSwitches.length > 0) {
-        this.dispatch('setWaitingInput', item.id);
-        const { player, rival, field } = this.getCompletePlayerState(item.id);
-        this.hooks[item.id - 1].onForceSwitch(player, rival, field, this.state.players[item.id - 1].forcedSwitches);
+  triggerOnForceSwitch(state, prevState) {
+    for (const id of this.getIds()) {
+      if (
+        state.players[id - 1].forcedSwitches.length > 0 &&
+        prevState.players[id - 1].forcedSwitches.length === 0
+      ) {
+        const { player, rival, field } = this.getCompletePlayerState(state, id);
+        this.hooks[id - 1].onForceSwitch(player, rival, field, this.state.players[id - 1].forcedSwitches);
       }
     }
   }
@@ -295,7 +295,6 @@ class Battle {
       passive: null,
       actions: null,
       forcedSwitches: null,
-      waitingInput: false,
     });
   }
 
@@ -370,22 +369,23 @@ class Battle {
   /**
    * Gets player's battle state.
    * @private
+   * @param {State} state
    * @param {number} playerId
    */
-  getCompletePlayerState(playerId) {
+  getCompletePlayerState(state, playerId) {
     const player = {
       id: playerId,
-      active: this.state.players[playerId - 1].active,
-      passive: this.state.players[playerId - 1].passive,
+      active: state.players[playerId - 1].active,
+      passive: state.players[playerId - 1].passive,
     };
     const rivalId = this.getRivalId(playerId);
     const rival = {
       id: rivalId,
-      active: this.state.players[rivalId - 1].active
+      active: state.players[rivalId - 1].active
         .map(item => item && { ...item, hp: Math.ceil( item.hp * 48 / item.maxhp ), maxhp: 48 }),
       passive: [], // FIXME: Only show Pokemon that have come out, otherwise set to null or something else.
     };
-    const field = this.state.field;
+    const field = state.field;
     return { player, rival, field };
   }
 
@@ -487,11 +487,12 @@ class Battle {
   /**
    * Triggers onMove hooks.
    * @private
+   * @param {State} state
    */
-  triggerOnMove() {
+  triggerOnMove(state) {
     const ids = this.getIds();
     for (const playerId of ids) {
-      const { player, rival, field } = this.getCompletePlayerState(playerId);
+      const { player, rival, field } = this.getCompletePlayerState(state, playerId);
       this.hooks[playerId - 1].onMove(player, rival, field);
     }
   }
@@ -678,10 +679,11 @@ class Battle {
   /**
    * Detects whether all actions have been set and responds accordingly.
    * @private
+   * @param {State} state
    */
-  commitActions() {
+  commitActions(state) {
     // Check if commands are complete
-    if (this.getSlotsMissingAction().length > 0) { return; }
+    if (this.getSlotsMissingAction(state).length > 0) { return; }
     // Execute commands
     this.dispatch('beginRun');
   }
