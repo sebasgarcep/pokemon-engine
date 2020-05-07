@@ -2,6 +2,7 @@
  * @typedef {import('../data/typedefs').Boosts} Boosts
  * @typedef {import('../data/typedefs').Spread} Spread
  * @typedef {import('./ItemStateFactory').ItemState} ItemState
+ * @typedef {import('./MoveStateFactory').MoveBuild} MoveBuild
  * @typedef {import('./MoveStateFactory').MoveState} MoveState
  */
 
@@ -75,7 +76,7 @@ class PokemonStateFactory {
 
   /**
    * Creates a Pokemon state from a Pokemon build.
-   * @param {string} id
+   * @param {any} id
    * @param {PokemonBuild} build
    * @returns {PokemonState}
    */
