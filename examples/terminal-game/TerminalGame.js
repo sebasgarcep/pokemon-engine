@@ -89,7 +89,7 @@ class TerminalGame {
     if (
       Number.isNaN(target) ||
       target < 1 ||
-      target > this.battle.format.active
+      target > this.battle.getFormat().active
     ) {
       throw new Error('Invalid target to show moves.');
     }
