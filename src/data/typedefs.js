@@ -1,10 +1,21 @@
+/**
+ * @typedef {import('../battle/BattleStateController').BattleState} BattleState
+ * @typedef {import('../battle/PokemonStateController').PokemonState} PokemonState
+ */
+
+/**
+ * @callback HookFunction
+ * @param {BattleState} state
+ * @param {PokemonState} [entity]
+ * @param {...any} [other]
+ */
 
 /**
  * @typedef {Object} Hooks
- * @property {Function} onActive
- * @property {Function} onBeforeDamageCalculation
- * @property {Function} onBeforeDamageApplication
- * @property {Function} onAfterAttack
+ * @property {HookFunction} [onActive]
+ * @property {HookFunction} [onBeforeDamageCalculation]
+ * @property {HookFunction} [onBeforeDamageApplication]
+ * @property {HookFunction} [onAfterAttack]
  */
 
 /**
@@ -28,38 +39,38 @@
   * @property {string} target
   * @property {Type} type
   * @property {number} priority
-  * @property {string | null} status
-  * @property {string | null} volatile
-  * @property {SecondaryEffects | null} secondary
-  * @property {{ boosts: Boosts } | null} self
-  * @property {string | null} effect
+  * @property {string | null} [status]
+  * @property {string | null} [volatile]
+  * @property {SecondaryEffects | null} [secondary]
+  * @property {{ boosts: Boosts } | null} [self]
+  * @property {string | null} [effect]
   * @property {MoveFlags} flags
   */
 
 /**
  * @typedef {Object} MoveFlags
- * @property {number} authentic
- * @property {number} bullet
- * @property {number} charge
- * @property {number} contact
- * @property {number} defrost
- * @property {number} heal
- * @property {number} mirror
- * @property {number} mystery
- * @property {number} nonsky
- * @property {number} powder
- * @property {number} protect
- * @property {number} punch
- * @property {number} reflectable
- * @property {number} sound
+ * @property {number} [authentic]
+ * @property {number} [bullet]
+ * @property {number} [charge]
+ * @property {number} [contact]
+ * @property {number} [defrost]
+ * @property {number} [heal]
+ * @property {number} [mirror]
+ * @property {number} [mystery]
+ * @property {number} [nonsky]
+ * @property {number} [powder]
+ * @property {number} [protect]
+ * @property {number} [punch]
+ * @property {number} [reflectable]
+ * @property {number} [sound]
  */
 
 /**
  * @typedef {Object} SecondaryEffects
- * @property {Boosts | null} boosts
+ * @property {Boosts | null} [boosts]
  * @property {number} chance
- * @property {string | null} status
- * @property {string | null} volatile
+ * @property {string | null} [status]
+ * @property {string | null} [volatile]
  */
 
 /**
