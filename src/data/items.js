@@ -16,12 +16,13 @@ const items = {
     desc: 'Holder\'s Fire-type attacks have 1.2x power.',
     hooks: {
       onBeforeDamageCalculation: (state, entity, opts) => {
-        if (opts.move.type === 'fire') {
+        if (
+          entity.id === opts.active.id &&
+          opts.move.type === 'fire'
+        ) {
           opts.power *= 1.2;
         }
       },
-      onBeforeDamageApplication: null,
-      onAfterAttack: null,
     }
   },
   widelens: {
@@ -40,9 +41,10 @@ const items = {
     desc: 'Holder\'s attacks do 1.3x damage, and it loses 1/10 its max HP after the attack.',
     hooks: {
       onBeforeDamageCalculation: (state, entity, opts) => {
-        opts.power *= 1.3;
+        if (entity.id === opts.active.id) {
+          opts.power *= 1.3;
+        }
       },
-      onBeforeDamageApplication: null,
       onAfterAttack: (state, entity, opts) => {
         if (entity.id === opts.active.id && opts.didDamage) {
           PokemonStateController.subtractHp(entity, entity.maxhp / 10);
@@ -56,7 +58,6 @@ const items = {
     num: 275,
     desc: 'If holder\'s HP is full, will survive an attack that would KO it with 1 HP. Single use.',
     hooks: {
-      onBeforeDamageCalculation: null,
       onBeforeDamageApplication: (state, entity, opts) => {
         if (
           entity.id === opts.target.id &&
@@ -67,7 +68,6 @@ const items = {
           opts.damage = entity.maxhp - 1;
         }
       },
-      onAfterAttack: null,
     },
   },
   eviolite: {
@@ -84,8 +84,6 @@ const items = {
           opts.defensiveStat *= 1.5;
         }
       },
-      onBeforeDamageApplication: null,
-      onAfterAttack: null,
     }
   },
   assaultvest: {
@@ -102,8 +100,6 @@ const items = {
           opts.defensiveStat *= 1.5;
         }
       },
-      onBeforeDamageApplication: null,
-      onAfterAttack: null,
     },
   },
 };

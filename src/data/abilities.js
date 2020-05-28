@@ -42,7 +42,14 @@ const abilities = {
     num: 89,
     desc: 'This Pokemon\'s punch-based attacks have their power multiplied by 1.2.',
     hooks: {
-
+      onBeforeDamageCalculation: (state, entity, opts) => {
+        if (
+          entity.id === opts.active.id &&
+          opts.move.flags.punch
+        ) {
+          opts.power *= 1.2;
+        }
+      }
     },
   },
   magicbounce: {
