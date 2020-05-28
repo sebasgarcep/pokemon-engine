@@ -6,13 +6,14 @@
 /**
  * @callback HookFunction
  * @param {BattleState} state
- * @param {PokemonState} [entity]
+ * @param {PokemonState} entity
  * @param {...any} [other]
  */
 
 /**
  * @typedef {Object} Hooks
  * @property {HookFunction} [onActive]
+ * @property {HookFunction} [onBeforeSpeedCalculation]
  * @property {HookFunction} [onBeforeDamageCalculation]
  * @property {HookFunction} [onBeforeDamageApplication]
  * @property {HookFunction} [onAfterAttack]

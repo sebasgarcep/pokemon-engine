@@ -954,10 +954,14 @@ class Battle {
   setOrder(state) {
     const order = this.getOccupiedActivePositions(state)
       .map(item => {
-        const speed = this.getBoostedStat(state, item.id, item.pos, 'spe');
-        // FIXME: do some speed modifications here, like trick room
-        const randomFactor = this.getRandom(state, 1, 1000);
-        return { ...item, speed, randomFactor };
+        const opts = {
+          active: BattleStateController.getPokemon(state, item.id, 'active', item.pos),
+          speed: this.getBoostedStat(state, item.id, item.pos, 'spe'),
+        };
+        HooksController.trigger('onBeforeSpeedCalculation', state, opts);
+        opts.speed = Math.floor(opts.speed);
+        const randomFactor = this.getRandom(state, 1, 1000000);
+        return { ...item, speed: opts.speed, randomFactor };
       })
       .filter(item => item !== null)
       .sort((a, b) => b.speed - a.speed || b.randomFactor - a.randomFactor);

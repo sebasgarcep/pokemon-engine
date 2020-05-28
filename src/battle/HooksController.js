@@ -18,7 +18,7 @@ class HooksController {
     // Field
     if (state.field.global.weather) {
       const weatherHook = weatherData[state.field.global.weather.id].hooks[hookName];
-      if (weatherHook) { weatherHook(state, ...args); }
+      if (weatherHook) { weatherHook(state, null, ...args); }
     }
     // FIXME: do this
     const activePositions = BattleStateController.getActivePositions(state);

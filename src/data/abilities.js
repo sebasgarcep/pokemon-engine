@@ -15,7 +15,14 @@ const abilities = {
     num: 34,
     desc: 'If Sunny Day is active, this Pokemon\'s Speed is doubled.',
     hooks: {
-
+      onBeforeSpeedCalculation: (state, entity, opts) => {
+        if (
+          state.field.global.weather.id === 'harshsunlight' &&
+          entity.id === opts.active.id
+        ) {
+          opts.speed *= 2;
+        }
+      }
     },
   },
   drought: {
